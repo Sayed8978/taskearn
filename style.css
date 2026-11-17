@@ -20,3 +20,4 @@ input{font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;
 .msg{margin:10px 0 0;font-size:.95rem}
 .err{color:#B3261E;margin-top:12px}
 .empty{color:var(--mute)}
+[hidden]{display:none!important}
