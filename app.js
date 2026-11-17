@@ -127,6 +127,7 @@ $("wForm").onsubmit = async (e) => {
     await addDoc(collection(db, "withdrawals"), {
       userId: u.uid,
       amount: amount,
+      number: $("num").value.trim(),
       status: "pending",
       createdAt: serverTimestamp()
     });
