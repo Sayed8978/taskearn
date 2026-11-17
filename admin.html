@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>TaskEarn অ্যাডমিন</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+li.w{flex-direction:column;align-items:stretch;gap:4px}
+.top{display:flex;justify-content:space-between;gap:12px;font-weight:500}
+.sub{color:var(--mute);font-size:.95rem}
+.acts{display:flex;gap:8px;margin-top:8px}
+.acts button{flex:1;padding:10px}
+button.no{background:transparent;color:#B3261E;border:1px solid #B3261E}
+</style>
+</head>
+<body>
+<main id="login" class="screen center" hidden>
+  <h1>অ্যাডমিন</h1>
+  <p>শুধু অ্যাডমিন একাউন্ট ঢুকতে পারবে।</p>
+  <button id="loginBtn">Google দিয়ে লগইন করুন</button>
+  <p id="err" class="err"></p>
+</main>
+
+<main id="app" class="screen" hidden>
+  <header>
+    <span id="who"></span>
+    <button id="logout" class="ghost">লগআউট</button>
+  </header>
+  <h2>উইথড্র অনুরোধ</h2>
+  <p id="msg" class="msg"></p>
+  <ul id="list"></ul>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+  from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, runTransaction, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "taskearn-fe85f.firebaseapp.com",
+  projectId: "taskearn-fe85f",
+  storageBucket: "taskearn-fe85f.firebasestorage.app",
+  messagingSenderId: "846804162602",
+  appId: "PASTE_YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = (id) => document.getElementById(id);
+const label = { pending: "অপেক্ষায়", paid: "পরিশোধিত", rejected: "বাতিল" };
+
+function show(which) {
+  $("login").hidden = which !== "login";
+  $("app").hidden = which !== "app";
+}
+
+$("loginBtn").onclick = async () => {
+  $("err").textContent = "";
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { $("err").textContent = "লগইন হয়নি (" + e.code + ")"; }
+};
+$("logout").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async (u) => {
+  if (!u) return show("login");
+  let ok = false;
+  try { ok = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch (e) {}
+  if (!ok) {
+    $("err").textContent = "এই একাউন্ট অ্যাডমিন নয়।";
+    await signOut(auth);
+    return show("login");
+  }
+  $("who").textContent = u.displayName || u.email;
+  show("app");
+  load();
+});
+
+function line(cls, text) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.textContent = text;
+  return d;
+}
+
+async function load() {
+  const list = $("list");
+  list.replaceChildren();
+  $("msg").textContent = "";
+  let rows = [];
+  try {
+    const snap = await getDocs(collection(db, "withdrawals"));
+    rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    $("msg").textContent = "তালিকা লোড হয়নি (" + e.code + ")";
+    return;
+  }
+  rows.sort((a, b) => {
+    const pa = a.status === "pending" ? 0 : 1, pb = b.status === "pending" ? 0 : 1;
+    return pa - pb || (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+  });
+  if (!rows.length) {
+    $("msg").textContent = "কোনো অনুরোধ নেই।";
+    return;
+  }
+  for (const w of rows) {
+    let u = {};
+    try { u = (await getDoc(doc(db, "users", w.userId))).data() || {}; } catch (e) {}
+    const li = document.createElement("li");
+    li.className = "w";
+    const top = document.createElement("div");
+    top.className = "top";
+    const a = document.createElement("span");
+    a.textContent = "৳" + w.amount;
+    const b = document.createElement("span");
+    b.textContent = label[w.status] || w.status;
+    top.append(a, b);
+    li.append(top,
+      line("sub", (u.name || "নাম নেই") + " · " + (u.email || "")),
+      line("sub", "নম্বর: " + (w.number || "দেওয়া হয়নি")),
+      line("sub", "বর্তমান ব্যালেন্স: ৳" + (Number(u.balance) || 0)));
+    if (w.status === "pending") {
+      const acts = document.createElement("div");
+      acts.className = "acts";
+      const pay = document.createElement("button");
+      pay.textContent = "পরিশোধিত";
+      pay.onclick = () => payIt(w);
+      const no = document.createElement("button");
+      no.className = "no";
+      no.textContent = "বাতিল";
+      no.onclick = () => rejectIt(w);
+      acts.append(pay, no);
+      li.append(acts);
+    }
+    list.append(li);
+  }
+}
+
+async function payIt(w) {
+  if (!confirm("৳" + w.amount + " কি " + (w.number || "") + " নম্বরে পাঠিয়ে দিয়েছেন? চাপলে ইউজারের ব্যালেন্স থেকে কাটা যাবে।")) return;
+  try {
+    await runTransaction(db, async (tx) => {
+      const wr = doc(db, "withdrawals", w.id);
+      const ur = doc(db, "users", w.userId);
+      const ws = await tx.get(wr);
+      const us = await tx.get(ur);
+      if (ws.data().status !== "pending") throw new Error("এটা আগেই প্রক্রিয়া হয়েছে");
+      const bal = Number((us.data() || {}).balance) || 0;
+      if (bal < w.amount) throw new Error("ইউজারের ব্যালেন্স কম");
+      tx.update(ur, { balance: bal - w.amount });
+      tx.update(wr, { status: "paid", paidAt: serverTimestamp() });
+    });
+  } catch (e) {
+    alert("হয়নি: " + (e.message || e.code));
+  }
+  load();
+}
+
+async function rejectIt(w) {
+  if (!confirm("এই অনুরোধ বাতিল করবেন?")) return;
+  try { await updateDoc(doc(db, "withdrawals", w.id), { status: "rejected" }); }
+  catch (e) { alert("হয়নি: " + e.code); }
+  load();
+}
+</script>
+</body>
+</html>
