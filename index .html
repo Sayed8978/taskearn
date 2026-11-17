@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TaskEarn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="login" class="screen center">
+  <h1>TaskEarn</h1>
+  <p>ছোট কাজ করুন, টাকা আয় করুন।</p>
+  <button id="loginBtn">Google দিয়ে লগইন করুন</button>
+  <p id="err" class="err"></p>
+</main>
+
+<main id="app" class="screen" hidden>
+  <header>
+    <span id="who"></span>
+    <button id="logout" class="ghost">লগআউট</button>
+  </header>
+
+  <section class="balance">
+    <span>আপনার ব্যালেন্স</span>
+    <strong id="bal">৳০</strong>
+  </section>
+
+  <section>
+    <h2>কাজের তালিকা</h2>
+    <ul id="tasks"></ul>
+  </section>
+
+  <section>
+    <h2>টাকা তুলুন</h2>
+    <form id="wForm">
+      <input id="amt" type="number" min="1" inputmode="numeric" placeholder="কত টাকা তুলবেন" required>
+      <button type="submit">উইথড্রর অনুরোধ পাঠান</button>
+    </form>
+    <p id="wMsg" class="msg"></p>
+    <ul id="wList"></ul>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
